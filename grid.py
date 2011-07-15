@@ -26,6 +26,10 @@ class Grid:
         self.GatherPath=cf.get('grid','GatherPath')
         self.serverlist=cf.get('grid','serverlist').split(',')
     def BuildServer(self):
+        print self.serverlist
+        mydb=DataBase(dblist=self.serverlist,host="localhost",username="opensim",password="1234")
+        mydb.StartUp()
+        mydb.PrepDatabase()
         if self.IsGrid():
             self.robust=RobustServer(self.serverlist[0],self.configpath,self.version)
             self.opensim=[]
@@ -106,7 +110,7 @@ class RobustServer(ServerInstant):
         self.ParseConfig(name,path)
         ServerInstant.__init__(self,self.name,"Robust",self.loc,version)
         self.GetServer()
-        self.InstallServer()
+        #self.InstallServer()
         self.SetConfig()
         self.StartUp()
         time.sleep(10) #check if the server startup
@@ -171,8 +175,9 @@ class GridOpenSimServer(ServerInstant):
         self.ParseConfig(name,path)
         ServerInstant.__init__(self,self.name,"OpenSim",self.loc,version)
         self.GetServer()
-        self.InstallServer()
+        #self.InstallServer()
         self.SetConfig()
+        self.SetRegions()
         self.StartUp()
         time.sleep(10) #check if the server startup
         #self.EditEstate()
@@ -242,14 +247,14 @@ class GridOpenSimServer(ServerInstant):
         fp.close()
         cf=ConfigParser.ConfigParser()
         cf.read(dst)
-        for region in self.RegionList:
+        for region in self.RegionsList:
             cf.add_section(region.name)
             cf.set(region.name,'RegionUUID',region.uuid)
-            cf.set(region.name,'Loction',self.locx+','+self.locy)
+            cf.set(region.name,'Loction',region.locx+','+region.locy)
             cf.set(region.name,'InternalAddress','0.0.0.0')
-            cf.set(region.name,'InternalPort',self.port)
+            cf.set(region.name,'InternalPort',region.port)
             cf.set(region.name,'AllowAlternatePorts','False')
-            cf.set(ExternalHostName,'SYSTEMIP')
+            cf.set(region.name,'ExternalHostName','SYSTEMIP')
         fp=open(dst,'wb')
         cf.write(fp)
         fp.close()
