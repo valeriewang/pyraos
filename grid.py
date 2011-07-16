@@ -1,4 +1,4 @@
-import ConfigParser
+
 import subprocess
 import MySQLdb
 import uuid
@@ -8,6 +8,9 @@ import xmlrpclib
 import urllib, urllib2
 import xml.dom.minidom
 import time
+
+
+
 
 class Grid:
     def __init__(self,configpath):
@@ -21,10 +24,11 @@ class Grid:
         self.version=cf.get('grid','version')
         print 'name='+self.name+' type='+self.type+' version='+self.version
         self.DataServerPath=cf.get('grid','DataServerPath')
-        self.DataServerConfigPath=cf.get('grid','DataServerConfigPath')
-        self.RegionDataPath=cf.get('grid','RegionDataPath')
+        self.grid_port=cf.get('grid','DataServerConfigPath')
+        self.node_port=cf.get('grid','RegionDataPath')
         self.GatherPath=cf.get('grid','GatherPath')
         self.serverlist=cf.get('grid','serverlist').split(',')
+        
     def BuildServer(self):
         print self.serverlist
         mydb=DataBase(dblist=self.serverlist,host="localhost",username="opensim",password="1234")
@@ -37,7 +41,6 @@ class Grid:
                 myopensim=GridOpenSimServer(osname,self.configpath,self.version)
     def IsGrid(self):
         return self.type=='grid'
-
 
 class ServerInstant:
     ServerDataCenter="http://localhost/"
@@ -376,31 +379,11 @@ class UserConsoleClient():
        })
        print urllib2.urlopen(url, params).read()
 
-class CAppConfig(ConfigParser.ConfigParser):
-    def setValue(self,section,option,value):    
-        self.set(section,option,value)
 
-    def getValue(self,section,option):
-        try:
-            value = self.get(section,option)
-        except ConfigParser.NoOptionError:
-            value = "<NoOption>"
-        return value
-
-    def optionxform(self,optionstr):
-        return optionstr             
-
-    def __init__(self,filename):
-        ConfigParser.ConfigParser.__init__(self)
-        self.filename=filename
-        self.read(filename)
-
-    def __del__(self):
-	fp = open(self.filename,"w")
-        self.write(fp)
-	fp.close()
 
        
 if __name__=='__main__':
-    mygrid=Grid('./MainConfig.ini')
-    mygrid.BuildServer()
+    myGridManager=GridManager('./MainConfig.ini')
+    myGridManager.Start()
+#    mygrid=Grid('./MainConfig.ini')
+#    mygrid.BuildServer()
