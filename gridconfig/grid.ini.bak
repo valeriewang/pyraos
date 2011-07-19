@@ -1,0 +1,43 @@
+[grid]
+datacenterpath = http://127.0.0.1
+nodelist = Node1
+name = mytestGrid
+version = 0.2
+type = grid
+
+[OpenSim1]
+remoteport = 9070
+remoteuser = "User"
+remotepsw = "1234"
+regions = v10,1001,1000,9010,v10.tgz;v11,1001,1001,9011,v11.tgz
+httplistenerport = 9099
+computer = 32
+dbtable = opensim1
+
+[OpenSim0]
+remoteport = 9071
+remoteuser = "User"
+remotepsw = "1234"
+regions = v00,1000,1000,9000,v00.tgz;v01,1000,1001,9001,v01.tgz
+httplistenerport = 9100
+computer = 32
+dbtable = opensim0
+
+[Node1]
+dbpsw = 1234
+dbprovider = MySQL
+dbhost = 127.0.0.1
+host = 127.0.0.1
+location = E:/test/
+dbuser = opensim
+serverlist = Robust,OpenSim0,OpenSim1
+listener_port = 8081
+
+[Robust]
+remoteport = 9070
+loginport = 8002
+remoteuser = User
+remotepsw = 1234
+userlist = rui,wang,1234,rui.wang@cysim.com;test,user,1234,test.user@cysim.com
+assetloader = true
+dbtable = robust

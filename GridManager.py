@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 #coding=utf-8
-from threading import Thread
-from SocketServer import ThreadingMixIn
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import ReadConfig
+import web
+import uuid
+import urllib2
+
+urls=("/GridSuccess","GridSuccess","/GridFail","GridFail","/AddGrid","AddGrid")
+app=web.application(urls,globals())
+
+GridDic={}
 
 class GridManager:
     def __init__(self,configpath):
@@ -14,55 +19,47 @@ class GridManager:
         self.grid_listener_port=cf.get('gridmanager','grid_listener_port')
         self.node_listener_port=cf.get('gridmanager','node_listener_port')
     def Start(self):
-        Thread(target=self.grid_server_on_port,args=[self.grid_listener_port]).start()
-        Thread(target=self.node_server_on_port,args=[self.node_listener_port]).start()
-    def grid_server_on_port(self,port):
-        server = ThreadingHTTPServer(("localhost",int(port)), GridHandler)
-        server.serve_forever()
-    def node_server_on_port(self,port):
-        server = ThreadingHTTPServer(("localhost",int(port)), NodeHandler)
-        server.serve_forever()
+        app.run()
     def CreateGrid(configpath):
-        mygrid=Grid(configpath)
-        mygrid.BuildServer()
+        mygrid=GridInfo(configpath)
+        mygrid.StartServer()
     
-class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
-    pass
-
-class GridHandler(BaseHTTPRequestHandler):
-    def do_POST(self):
-
+class GridSuccess:
+    def Post(self,path):
+        data=web.data()
+        #TODO parse data
+    def AddGrid(self,id):
+        grid=GridDic[id]
+        grid.state=True
+    def DeleteGrid(self,id):
+        grid=GridDic[id]
+        grid.state=False    
         
-        if self.path=="/CreateGrid/":
-            AddGrid(ConfigPath)
-        elif self.path=='/ShowGrid/':
-            ShowGrid()
-        print self.path, self.command,self.client_address
-        if self.rfile:
-            data=self.rfile.read()
-        else:
-            print 'no data'
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write("Grid Server")
-    def AddGrid(self):
-        pass
-    def ShowGrid(self):
-        pass
+
+class GridInfo:
+    def __init__(self,path):
+        self.path=path
+        ParseConfig(paht)
+        self.state=False
+        StartServer()
+    def ParseConfig(self,path):
+        self.cf=ReadConfig.CAppConfig(path)
+        self.ID=uuid.uuid4()
+        self.Name=cf.get('grid','name')
+        self.DataCenterPath=cf.get('grid','datacenterpath')
+        self.Version=cf.get('grid','version')
+        self.type=cf.get('grid','type')
+        self.NodeList=cf.get('grid','nodelist').split(',')
+    def StartServer(self):
+        file="MainConfig.ini"
+        #TODO upload config file
+        for name in self.NodeList:
+            data="Method=StartServer,Name={0},file={1}".format(name,file)
+            host=cf.get(name,'host')
+            req=urllib2.Request(url=host+':8070',data=data)
+            response=urllib2.urlopen(req)
         
-class NodeHandler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        print self.path,self.command
-        print self.rfile;
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write("Node Server")
-
-
 if __name__=='__main__':
     myGridManager=GridManager('./MainConfig.ini')
     myGridManager.Start()
+    myGridManager.CreateGrid('../gridconfig/Grid.ini')
