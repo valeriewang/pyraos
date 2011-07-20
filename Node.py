@@ -5,24 +5,33 @@ import chilkat
 import ReadConfig
 import os
 import MySQLdb
-import grid
+import Server
 import urllib2
+import sys
 
-urls=("/AddNode","AddNode","/DeleteNode","DeleteNode")
+urls=("/AddNode","AddNode","/DeleteNode","DeleteNode",'/AddServer','AddServer','/AddRegion','AddRegion','/AddUser','AddUser')
 app=web.application(urls,globals())
 
 class NodeServer:
-    def __init__(self):
-        pass
-    def StartServer(self):
+    def __init__(self,configpath):
+        self.ParseConfig(configpath)
+    def ParseConfig(self,path):
+        cf=ReadConfig.CAppConfig(path)
+        self.name=cf.get('NodeServer','name')
+        self.node_listener_port=cf.get('NodeServer','node_listener_port')
+        print '[NodeServer {0}]port={1}'.format(self.name,self.node_listener_port)
+    def Start(self):
         app.run()
 
 class AddNode:
-    def POST(self,path):
+    def GET(self):
+        print 'AddNode'
+    def POST(self):
         datalist=web.data().split(',')
-        print '[AddNode]datalist='+datalist
+        print '[AddNode]datalist=',datalist
         for data in datalist:
             key,value=data.split('=')
+            print 'key={0},value={1}'.format(key,value)
             if key=='Method':
                 self.method=value
             elif key=='Name':
@@ -30,14 +39,33 @@ class AddNode:
             elif key=='file':
                 filepath=value
         #TODO get uploaded config file
-        source=path+"/configfile/"+filepath
+        source=filepath
+        dst='./'+nodename+'.ini'
         response=urllib2.urlopen(source)
-        
-        temp=open('/',w)
-        temp.write(response)
+        temp=open(dst,'wb')
+        temp.write(response.read())
         temp.close()
-        newNode=Node(name,'/')
+        newNode=Node(nodename,dst)
+        newNode.BuildServers()
+        print 'a new node is ok'
+        return True
     
+
+class AddServer:
+    def POST(self):
+        datalist=web.data().split(',')
+#        print '[AddServer]datalist=',datalist
+#        for data in datalist:
+#            key,value=data.split('=')
+#            print 'key={0},value={1}'.format(key,value)
+#            if key=='Method':
+#                self.method=value
+#            elif key=='Name':
+#                nodename=value
+#            elif key=='file':
+#                filepath=value
+        
+        
 class DeleteNode:
     def POST():
         pass
@@ -48,20 +76,22 @@ class Node:
         self.configpath=configpath
         self.ParseConfig(configpath)
     def ParseConfig(self,path):
-        cf=ReadConfig.CAppConfig(path)
-        self.DataCenter=cf.get('grid','datacenterpath')
-        self.Version=cf.get('grid','version')
-        self.type =cf.get('grid','type')
-        self.loc=cf.get(self.name,'location')
-        self.host=cf.get(self.name,'host')
-        self.ServerList=cf.get(self.name,'serverlist').split(',')
-        if cf.get(self.name,'dbprovider').lower()=='mysql':
+        self.cf=ReadConfig.CAppConfig(path)
+        self.DataCenter=self.cf.get('grid','datacenterpath')
+        self.Version=self.cf.get('grid','version')
+        self.type =self.cf.get('grid','type')
+        self.loc=self.cf.get(self.name,'location')
+        self.host=self.cf.get(self.name,'host')
+        print '[Node {0}]Version={1},type={2},loc={3},host={4},datacenter={5}'.format(self.name,self.Version,self.type,self.loc,self.host,self.DataCenter)
+        self.ServerList=self.cf.get(self.name,'serverlist').split(',')
+        print 'serverlist=',self.ServerList
+        if self.cf.get(self.name,'dbprovider').lower()=='mysql':
             dbprovider="OpenSim.Data.MySQL.dll"
         #TODO add more database
-        self.dbParams={'dbProvider':dbprovider,'dbHost':cf.get(self.name,'dbhost'),'dbUser':cf.get(self.name,'dbuser'),'dbPsw':cf.get(self.name,'dbpsw')}
+        self.dbParams={'dbProvider':dbprovider,'dbHost':self.cf.get(self.name,'dbhost'),'dbUser':self.cf.get(self.name,'dbuser'),'dbPsw':self.cf.get(self.name,'dbpsw')}
         self.dbList=[]
         for name in self.ServerList:
-            self.dbList.append(cf.get(name,'dbtable'))
+            self.dbList.append(self.cf.get(name,'dbtable'))
     def BuildServers(self):
         print "[BuidlServers]download and uncompress server"
         self.GetServer()
@@ -70,16 +100,20 @@ class Node:
         print '[BuidlServers]mode is {0} ServerList is {1}'.format(self.type,self.ServerList)
         #TODO src should not be self.loc+'bin'
         if self.IsGrid():
-            self.robust=grid.RobustServer(self.ServerList[0],self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
-            self.robust.StartUp()
+            print 'ServerList',self.ServerList
             self.gridopensim=[]
-            for osname in self.ServerList[1:len(self.ServerList)]:
-                myopensim=grid.GridOpenSimServer(osname,self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
-                myopensim.StartUp()
-                self.gridopensim.append(myopensim)
+            for name in self.ServerList:
+                print 'name=',name
+                if self.cf.get(name,'type')=='robust':
+                    self.robust=Server.RobustServer(name,self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
+                    self.robust.StartUp()
+                elif self.cf.get(name,'type')=='gridopensim':    
+                    myopensim=Server.GridOpenSimServer(name,self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
+                    myopensim.StartUp()
+                    self.gridopensim.append(myopensim)
         else:
-            pass
-            #TODO 7/15/2010 startup a standalone mode server
+            self.opensim=Server.OpenSimServer(self.ServerList[0],self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
+            self.opensim.StartUp()
     def ShutDownServer(self):
         pass
     def DeleteServer(self):
@@ -158,7 +192,14 @@ class DataBase:
 
 
 if __name__=='__main__':
-    server=NodeServer()
-    server.StartServer()
-    #mytestNode=Node('Node1','./MainConfig.ini')
-    #mytestNode.BuildServers()
+    if len(sys.argv)==3:
+        print '[NodeServer]configpath=',sys.argv[2]
+        configpath=sys.argv[2]
+    else:
+        configpath='./NodeServer.ini'
+    server=NodeServer(configpath)
+    server.Start()
+#    t=threading.Thread(target=server.Start)
+#    t.start()
+#    mytestNode=Node('Node1','./gridconfig/gridA.ini')
+#    mytestNode.BuildServers()

@@ -1,0 +1,25 @@
+[Node1]
+dbpsw = 1234
+dbprovider = MySQL
+dbhost = 127.0.0.1
+host = 127.0.0.1
+location = E:/test/1/
+dbuser = opensim
+serverlist = OpenSim
+port = 8071
+listener_port = 8081
+
+[OpenSim]
+userlist = rui,wang,1234,myemail
+regions = v00,1000,1000,9000,v00.tgz
+httplistenerport = 9090
+computer = 32
+dbtable = opensim
+
+[grid]
+datacenterpath = http://127.0.0.1
+nodelist = Node1
+name = GridA
+version = 0.3
+type = standalone
+
