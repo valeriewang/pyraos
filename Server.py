@@ -7,6 +7,7 @@ import xmlrpclib
 import urllib, urllib2
 import xml.dom.minidom
 import time
+
 import ReadConfig
 import copytree
 
@@ -59,7 +60,7 @@ class RobustServer(ServerInstant):
         self.RemotePort=cf.get(name,'remoteport')
         self.RemotePath="http://"+self.host+":"+self.RemotePort
         self.LoginPath=self.host+':'+cf.get(name,'loginport')
-        self.AssetLoader=cf.get(name,'assetloader')
+        #self.AssetLoader=cf.get(name,'assetloader')
         print 'robust login path is '+self.LoginPath
         ulist=cf.get(name,"userlist").split(';')
         self.userlist=[]
@@ -166,6 +167,7 @@ class GridOpenSimServer(ServerInstant):
         self.dbTable=cf.get(name,'dbtable')      
         self.httplistenerport=cf.get(name,"httplistenerport")
         self.remoteurl='http://'+self.host+':'+self.httplistenerport
+        self.robusturl=cf.get(name,'robusturl')
         rlist=cf.get(name,"regions").split(';')
         self.RegionsList=[]
         for regionstring in rlist:
@@ -207,6 +209,17 @@ class GridOpenSimServer(ServerInstant):
         cf.set('DatabaseService','StorageProvider','\"'+self.dbParams['dbProvider']+'\"')
         connString="Data Source={0};Database={1};User ID={2};Password={3};Old Guids=true;".format(self.dbParams['dbHost'],self.dbTable,self.dbParams['dbUser'],self.dbParams['dbPsw'])
         cf.set('DatabaseService','ConnectionString','\"'+connString+'\"')
+        cf.set('AssetService','AssetServerURI',self.robusturl)
+        cf.set('InventoryService','InventoryServerURI',self.robusturl)
+        cf.set('GridService','GridServerURI',self.robusturl)
+        cf.set('AvatarService','AvatarServerURI',self.robusturl)
+        cf.set('PresenceService','PresenceServerURI',self.robusturl)
+        cf.set('UserAccountService','UserAccountServerURI',self.robusturl)
+        cf.set('GridUserService','GridUserServerURI',self.robusturl)
+        cf.set('AuthenticationService','AuthenticationServerURI',self.robusturl)
+        cf.set('FriendsService','FriendsServerURI',self.robusturl)
+        cf.set('AssetService','AssetServerURI',self.robusturl)
+        cf.set('AssetService','AssetServerURI',self.robusturl)
         fp=open(dst,'wb')
         cf.write(fp)
         fp.close()
