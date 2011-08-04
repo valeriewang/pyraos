@@ -225,24 +225,6 @@ class GridOpenSimServer(ServerInstant):
         cf.write(fp)
         fp.close()
         
-    def SetRegions(self):
-        dst=self.loc+self.name+"/Regions/Regions.ini"
-        fp=open(dst,'w')
-        fp.close()
-        cf=ReadConfig.CAppConfig(dst)
-        for region in self.RegionsList:
-            print 'Region {0}:uuid={1},locx={2},locy={3},port={4}'.format(region.name,str(region.uuid),region.locx,region.locy,region.port)
-            cf.add_section(region.name)
-            cf.set(region.name,'RegionUUID',str(region.uuid))
-            cf.set(region.name,'Location',region.locx+','+region.locy)
-            cf.set(region.name,'InternalAddress','0.0.0.0')
-            cf.set(region.name,'InternalPort',region.port)
-            cf.set(region.name,'AllowAlternatePorts','False')
-            cf.set(region.name,'ExternalHostName','SYSTEMIP')
-        fp=open(dst,'wb')
-        cf.write(fp)
-        fp.close()
-        
     def AddRegion(self,regionList):
         print 'remoteurl:',self.remoteurl
         server=xmlrpclib.Server(self.remoteurl)
@@ -397,7 +379,7 @@ class UserConsoleClient():
 
        
 if __name__=='__main__':
-    pass
+    print 'now no test run'
     #test robust mode  ok
 #    robustConfigDic={'ID':'myrobust','loc':'E:/test/2/robust','src':'E:/test/2/0.3.rar','dbProvider':'OpenSim.Data.MySQL.dll','connString':'Data Source=127.0.0.1;Database=robust;User ID=opensim;Password=1234;Old Guids=true;','listener_port':8003,'login_port':8002,'host':'http://127.0.0.1','DataCenter':'http://localhost'}
 #    robustServer=RobustServer(robustConfigDic)

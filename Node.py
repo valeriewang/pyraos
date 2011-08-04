@@ -9,48 +9,101 @@ import Server
 import urllib2
 import sys
 
-urls=("/AddNode","AddNode","/DeleteNode","DeleteNode",'/AddServer','AddServer','/AddRegion','AddRegion','/AddUser','AddUser')
+DefaultServerPath='/server/'
+DefaultConfigPath='/config/'
+DefaultDataPath='/oar/'
+
+urls=("/CreateNode","CreateNode",
+      "/StartupNode","StartupNode",
+      "/ShutDownNode","ShutDownNode",
+      "/DeleteNode","DeleteNode",
+      '/AddServer','AddServer',
+      '/ShutDownServer','ShutDownServer',
+      '/DeleteServer','DeleteServer',
+      '/AddRegion','AddRegion',
+      '/AddUser','AddUser')
 app=web.application(urls,globals())
+NodeDic={}
+loc=''
 
 class NodeServer:
     def __init__(self,configpath):
         self.ParseConfig(configpath)
+        #register in GridManager
+        self.Start()
     def ParseConfig(self,path):
         cf=ReadConfig.CAppConfig(path)
         self.name=cf.get('NodeServer','name')
         self.node_listener_port=cf.get('NodeServer','node_listener_port')
+        loc=cf.get('NodeServer','loc')
         print '[NodeServer {0}]port={1}'.format(self.name,self.node_listener_port)
     def Start(self):
         app.run()
 
-class AddNode:
-    def GET(self):
-        print 'AddNode'
+class CreateNode:
     def POST(self):
-        datalist=web.data().split(',')
-        print '[AddNode]datalist=',datalist
+        datalist=web.data().split('&')
+        print '[CreateNode]datalist=',datalist
+        configdic=ParserData(datalist)
+        if len(configdic)==0:
+            return 'success=False&reason=config string is not right'
+        newNode=Node(configdic)
+        if newNode.BuildServers():
+            return 'success=True'
+        return 'success=False&reason=build server fail'
+    def ParserData(datalist):
+        configdic={}
+        serverlist=[]
+        serverdic={}
         for data in datalist:
             key,value=data.split('=')
-            print 'key={0},value={1}'.format(key,value)
-            if key=='Method':
-                self.method=value
-            elif key=='Name':
-                nodename=value
-            elif key=='file':
-                filepath=value
-        #TODO get uploaded config file
-        source=filepath
-        dst='./'+nodename+'.ini'
-        response=urllib2.urlopen(source)
-        temp=open(dst,'wb')
-        temp.write(response.read())
-        temp.close()
-        newNode=Node(nodename,dst)
-        newNode.BuildServers()
-        print 'a new node is ok'
+            configdic[key]=value
+        if configdic.has_key('serverList'):
+            for strServer in dic['serverList']:
+                serverParams=strServer.split(',')
+                for param in serverParams:
+                    key,value=param.split(':')
+                    serverdic[key]=value
+                serverlist.append(serverdic)
+            configdic['serverList']=serverlist
+        if self.HasPrimaryKey(configdic):
+            return configdic
+        else:
+            return {}
+    def HasPrimaryKey(dic):
+        primaryKey=['NodeName','type','version','dbPrivider','dbHost','dbUser','dbPsw','serverList','resetDB','dataCenter']
+        serverPrimaryKey=['ID','type','listener_port','dbTable']
+        robustPrimaryKey=['login_port']
+        gridopensimPrimaryKey=[]
+        opensimPrimaryKey=[]
+        for key in primaryKey:
+            if not dic.has_key(key):
+                print 'lost key {0}'.format(key)
+                return False
+        for server in dic['serverList']:
+            for key in serverPrimaryKey:
+                if not dic.has_key(key):
+                    print 'lost key {0} in server'.format(key)
+            if server['type']=='robust':
+                for key in robustPrimaryKey:
+                    if not dic.has_key(key):
+                        print 'lost key {0} in server'.format(key)
+            elif server['type']=='gridopensim':
+                for key in gridopensimPrimaryKey:
+                    if not dic.has_key(key):
+                        print 'lost key {0} in server'.format(key)
+            elif server['type']=='opensim':
+                for key in opensimPrimaryKey:
+                    if not dic.has_key(key):
+                        print 'lost key {0} in server'.format(key)
+            else:
+                return False
         return True
-    
 
+class StartUpNode::
+    def POST(self):
+        
+        
 class AddServer:
     def POST(self):
         datalist=web.data().split(',')
@@ -71,57 +124,127 @@ class DeleteNode:
         pass
 
 class Node:
-    def __init__(self,name,configpath):
-        self.name=name
-        self.configpath=configpath
-        self.ParseConfig(configpath)
-    def ParseConfig(self,path):
-        self.cf=ReadConfig.CAppConfig(path)
-        self.DataCenter=self.cf.get('grid','datacenterpath')
-        self.Version=self.cf.get('grid','version')
-        self.type =self.cf.get('grid','type')
-        self.loc=self.cf.get(self.name,'location')
-        self.host=self.cf.get(self.name,'host')
-        print '[Node {0}]Version={1},type={2},loc={3},host={4},datacenter={5}'.format(self.name,self.Version,self.type,self.loc,self.host,self.DataCenter)
-        self.ServerList=self.cf.get(self.name,'serverlist').split(',')
-        print 'serverlist=',self.ServerList
-        if self.cf.get(self.name,'dbprovider').lower()=='mysql':
-            dbprovider="OpenSim.Data.MySQL.dll"
-        #TODO add more database
-        self.dbParams={'dbProvider':dbprovider,'dbHost':self.cf.get(self.name,'dbhost'),'dbUser':self.cf.get(self.name,'dbuser'),'dbPsw':self.cf.get(self.name,'dbpsw')}
-        self.dbList=[]
-        for name in self.ServerList:
-            self.dbList.append(self.cf.get(name,'dbtable'))
+    def __init__(self,configDic):
+        self.configDic=configDic
+        self.dbDic={}
+        for server in configDic['serverList']:
+            self.dbDic[server['serverName']]=server['dbTable']
     def BuildServers(self):
-        print "[BuidlServers]download and uncompress server"
-        self.GetServer()
-        mydb=DataBase(dblist=self.dbList,host=self.dbParams['dbHost'],username=self.dbParams['dbUser'],password=self.dbParams['dbPsw'])
-        mydb.PrepDatabase()
+        if not self.GetServer():
+            return False
+        try:
+            mydb=DataBase(dblist=self.dbDic,host=self.configDic['dbHost'],username=self.configDic['dbUser'],password=self.configDic['dbPsw'])
+            mydb.PrepDatabase()
+        except:
+            print 'db error'
+            return False
         print '[BuidlServers]mode is {0} ServerList is {1}'.format(self.type,self.ServerList)
-        #TODO src should not be self.loc+'bin'
-        if self.IsGrid():
-            print 'ServerList',self.ServerList
-            self.gridopensim=[]
-            for name in self.ServerList:
-                print 'name=',name
-                if self.cf.get(name,'type')=='robust':
-                    self.robust=Server.RobustServer(name,self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
-                    self.robust.StartUp()
-                elif self.cf.get(name,'type')=='gridopensim':    
-                    myopensim=Server.GridOpenSimServer(name,self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
-                    myopensim.StartUp()
-                    self.gridopensim.append(myopensim)
+        try:
+            if self.IsGrid():
+                self.type='grid'
+                self.gridopensim=[]
+                for serverconfig in self.configDic['serverList']:
+                    config={}
+                    config['ID']=serverconfig['serverID']
+                    config['loc']=loc+self.configDic['NodeName']+'/'+serverconfig['serverID']
+                    config['src']=loc+self.configDic['NodeName']+'/'+self.configDic['version']
+                    config['dbProvider']=self.configDic['dbProvider']
+                    config['connString']="Data Source={0};Database={1};User ID={2};Password={3};Old Guids=true;".format(self.configDic['dbHost'],serverconfig['dbTable'],self.configDic['dbUser'],self.configDic['dbPsw'])
+                    config['listener_port']=serverconfig['listener_port']
+                    config['host']=self.configDic['host']
+                    config['DataCenter']=self.configDic['dataCenter']
+                    if serverconfig['type']=='robust':
+                        config['login_port']=serverconfig['login_port']
+                        self.robust=Server.RobustServer(config)
+                    elif serverconfig['type']=='gridopensim':
+                        myserver=Server.GridOpenSimServer(serverconfig)
+                    self.gridopensim.append(myserver)
+            else:
+                self.type='standalone'
+                config={}
+                config['ID']=serverconfig['serverID']
+                config['loc']=loc+self.configDic['NodeName']+'/'+serverconfig['serverID']
+                config['src']=loc+self.configDic['NodeName']+'/'+self.configDic['version']
+                config['dbProvider']=self.configDic['dbProvider']
+                config['connString']="Data Source={0};Database={1};User ID={2};Password={3};Old Guids=true;".format(self.configDic['dbHost'],serverconfig['dbTable'],self.configDic['dbUser'],self.configDic['dbPsw'])
+                config['listener_port']=serverconfig['listener_port']
+                config['host']=self.configDic['host']
+                config['DataCenter']=self.configDic['dataCenter']                
+                self.opensim=Server.OpenSimServer(serverconfig)
+        except:
+            print 'server error'
+            return False
+    def StartupServers(self):
+        if self.type =='grid':
+            if not self.robust==null:
+                if robust.state==False:
+                    if not self.robust.StartUp():
+                        return False
+            for server in self.gridopensim:
+                if server.state==False:
+                    if not server.StartUp():
+                        return False
+            return True
+        elif self.type='standalone':
+            if opensim.state==False:
+                return self.opensim.StartUp()
+            return True
         else:
-            self.opensim=Server.OpenSimServer(self.ServerList[0],self.configpath,self.host,self.loc,self.loc+'bin',self.dbParams)
-            self.opensim.StartUp()
+            return False
+    def ShutDownServers(self):
+        if self.type =='grid':
+            for server in self.gridopensim:
+                if server.state==True:
+                    if not server.ShutDown():
+                        return False
+            if not self.robust==null:
+                if robust.state==True:
+                    if not self.robust.ShutDown():
+                        return False
+            return True
+        elif self.type='standalone':
+            if not opensim.state==True:
+                return self.opensim.ShutDown()
+            return True
+        else:
+            return False
+    def DeleteServers(self):
+        if self.type =='grid':
+            for server in self.gridopensim:
+                if not server.ShutDown():
+                    return False
+                if not server.Delete():
+                    return False
+                self.gridopensim.remove(server)
+            if not self.robust==null:
+                if not self.robust.ShutDown():
+                    return False
+                if not self.robust.Delete():
+                    return False
+                self.robust=null
+            return True
+        elif self.type='standalone':
+            if not self.opensim.ShutDown():
+                return False
+            if not self.opensim.Delete():
+                return False
+            self.opensim=null
+            return True
+        else:
+            return False
+    def BuildServer(self,config):
+        name=config['serverName']        
+    def StartupServer(self):
+        ${0}
     def ShutDownServer(self):
-        pass
-    def DeleteServer(self):
-        pass
+        ${0}
+    def DeteteServer(self):
+        ${0}
     def GetServer(self):
-        #TODO more fileType
+        print "[BuidlServers-GetServer]download server"
+        #TODO how to get fileType
         self.fileType='.rar'
-        source=self.DataCenter+'/server/'+self.Version+self.fileType
+        source=self.DataCenter+DefaultServerPath+self.configDic['version']+self.fileType
         dst=self.loc+self.Version+self.fileType
         if not os.path.exists(dst):
             try:
@@ -131,20 +254,16 @@ class Node:
                 output.write(response.read())
                 output.close()
                 print '[GetServer]server download ok'
+                return True
             except:
                 print '[GetServer]download fail'
+                return False
         else:
             print "[GetServer]server data exists"
-        print '[GetServer]uncompress server'
-        if self.fileType==".rar":
-            unCompress=chilkat.CkRar()
-        elif self.fileType==".zip":
-            unCompress=chilkat.CkZip()
-        unCompress.Open(dst)
-        unCompress.Unrar(self.loc)
-        print '[GetServer]uncompress ok'
+            return True
     def IsGrid(self):
-        return self.type=='grid'
+        print 'server type is {0}'.format(self.configDic['type'])
+        return self.configDic['type']=='grid'
 
 class DataBase:
     def __init__(self,username,password,dblist,host="localhost"):
